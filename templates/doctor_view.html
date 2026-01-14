@@ -174,8 +174,18 @@
                         <strong>{{ case.raw_data.age }} years old / {{ case.raw_data.gender }}</strong>
                     </div>
                     <div class="col-md-3">
-                        <small class="text-muted text-uppercase">Timestamp</small><br>
-                        <strong>{{ case.raw_data.timestamp }}</strong>
+                        <small class="text-muted text-uppercase">Risk Level</small><br>
+                        {% if case.ai_analysis.doctor_view.urgency_level == 'High' %}
+                            <span class="badge bg-danger fs-6">High Urgency</span>
+                        {% elif case.ai_analysis.doctor_view.urgency_level == 'Medium' %}
+                            <span class="badge bg-warning text-dark fs-6">Medium Urgency</span>
+                        {% else %}
+                            <span class="badge bg-success fs-6">Low Urgency</span>
+                        {% endif %}
+                        
+                        {% if case.ai_analysis.doctor_view.follow_up_required %}
+                             <span class="badge bg-info text-dark ms-2">Follow-up Req.</span>
+                        {% endif %}
                     </div>
                     <div class="col-md-3">
                         <small class="text-muted text-uppercase">⚠️ Allergies</small><br>
@@ -275,6 +285,29 @@
                     <span class="soap-label">
                         <i class="fas fa-brain me-2"></i>A - Assessment (Diagnosis & Differential)
                     </span>
+                    
+                    <!-- Confidence Scores -->
+                    {% if case.ai_analysis.doctor_view.possible_conditions %}
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3">Diagnostic Confidence:</h6>
+                        {% for condition in case.ai_analysis.doctor_view.possible_conditions %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>{{ condition.name }}</span>
+                                <span class="fw-bold">{{ (condition.confidence * 100) | round | int }}%</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar {% if condition.confidence > 0.7 %}bg-success{% elif condition.confidence > 0.4 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                     role="progressbar" 
+                                     style="width: {{ condition.confidence * 100 }}%">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <hr>
+                    {% endif %}
+
                     <ul class="soap-list">
                         {% for item in case.ai_analysis.doctor_view.assessment_list %}
                         <li>{{ item | safe }}</li>
