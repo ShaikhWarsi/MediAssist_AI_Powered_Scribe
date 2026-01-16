@@ -418,10 +418,12 @@ def log_interaction(case_id, inputs, latency):
         logging.error(f"Logging Error: {e}")
 
 
-def log_audit_action(action, case_id=None):
+def log_audit_action(action, case_id=None, user_id=None):
     """Log an audit action to the database."""
     try:
-        user_id = session.get("user_id")
+        if user_id is None:
+            user_id = session.get("user_id")
+            
         if not user_id:
             return
 
@@ -435,9 +437,15 @@ def log_audit_action(action, case_id=None):
         db.session.commit()
 
         # Also log to standard logging for visibility
-        username = (
-            session.get("account_name") or session.get("name") or f"User {user_id}"
-        )
+        if user_id == session.get("user_id"):
+            username = (
+                session.get("account_name") or session.get("name") or f"User {user_id}"
+            )
+        else:
+            # If we're logging for a different user (e.g. attributing summary to doctor)
+            user = get_user_by_id(user_id)
+            username = user["full_name"] if user else f"User {user_id}"
+            
         logging.info(
             f"AUDIT LOG: User: {username} | Action: {action} | Case: {case_id} | Time: {new_log.timestamp}"
         )
@@ -553,6 +561,9 @@ def patient_submit():
             "language": selected_language,
         }
 
+        # Log initial case creation immediately
+        log_audit_action("case_creation", case_id)
+
         formatted_prompt = SYSTEM_PROMPT.format(language=selected_language)
         prompt = (
             f"{formatted_prompt}\nPATIENT DATA: {json.dumps(raw_data, default=str)}"
@@ -611,9 +622,8 @@ def patient_submit():
         }
         add_case(case_record)
 
-        # Log audit actions
-        log_audit_action("case_creation", case_id)
-        log_audit_action("generate_summary", case_id)
+        # Log summary generation - attribute to the assigned doctor as per clinical workflow
+        log_audit_action("generate_summary", case_id, user_id=doctor_id)
 
         log_interaction(case_id, raw_data, time.time() - start_time)
         return redirect(url_for("patient_result", case_id=case_id))
